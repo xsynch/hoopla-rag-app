@@ -6,10 +6,10 @@ STOPWORD_FILE = "data/stopwords.txt"
 
 
 
-def removePunctuation(word):
-    translator = str.maketrans('','',string.punctuation) 
-    cleaned_string = word.translate(translator)
-    return cleaned_string
+def removePunctuation(text:str):
+    text = text.lower()
+    text = text.translate(str.maketrans("", "", string.punctuation))
+    return text
 
 
 def load_and_strip_stopwords(data):
@@ -22,3 +22,8 @@ def load_and_strip_stopwords(data):
         return None 
     else:
         return data 
+    
+
+def load_stop_words() -> list[str]:
+        with open(STOPWORD_FILE) as f:        
+            return f.read().splitlines()

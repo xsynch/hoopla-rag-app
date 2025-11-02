@@ -2,14 +2,26 @@
 
 import argparse
 import json 
+
 import string
 import re 
 
+
+
 from lib.invertedindex import InvertedIndex
-from lib import stems
+# from lib import stems
 from lib import searchutils
 
 
+
+
+BM25_K1 = 1.5
+BM25_B = 0.75
+
+# from lib.searchutils import (
+#     BM25_K1,
+#     BM25_B
+# )
 
 JSON_FILE = "data/movies.json"
 STOPWORD_FILE = "data/stopwords.txt"
@@ -27,7 +39,30 @@ def main() -> None:
     freq_search_parser.add_argument("docid", type=str, help="Document ID to search in")
     freq_search_parser.add_argument("term", type=str, help="Term Frequency query")
 
+    idf_parser = subparsers.add_parser("idf",help="Create and list Inverse Document Frequency")
+    idf_parser.add_argument("query",help="Term to use")
+    
+    tfidf_parser = subparsers.add_parser("tfidf",help="Create and list Inverse Document Frequency")
+    tfidf_parser.add_argument("docid",help="Document ID to use")
+    tfidf_parser.add_argument("term",help="Term to use")
+    
+    bm25_idf_parser = subparsers.add_parser('bm25idf', help="Get BM25 IDF score for a given term")
+    bm25_idf_parser.add_argument("term", type=str, help="Term to get BM25 IDF score for")
+
+    bm25_tf_parser = subparsers.add_parser(
+    "bm25tf", help="Get BM25 TF score for a given document ID and term"
+    )
+    bm25_tf_parser.add_argument("doc_id", type=int, help="Document ID")
+    bm25_tf_parser.add_argument("term", type=str, help="Term to get BM25 TF score for")
+    bm25_tf_parser.add_argument("b", type=float, nargs='?', default=BM25_B, help="Tunable BM25 b parameter")
+    bm25_tf_parser.add_argument("k1", type=float, nargs='?', default=BM25_K1, help="Tunable BM25 K1 parameter")
+
+    bm25search_parser = subparsers.add_parser("bm25search", help="Search movies using full BM25 scoring")
+    bm25search_parser.add_argument("query", type=str, help="Search query")
+    
+
     search_parser = subparsers.add_parser("build", help="Build index of movies and create cache")
+    
     
 
     args = parser.parse_args()
@@ -42,6 +77,19 @@ def main() -> None:
             term_frequency_search(args.docid, args.term)
         case "build":
             build_index()
+        case "idf":
+            print(f"Creating Inverse Document Frequency for {args.query}")
+            idf_build(args.query)
+        case "tfidf":
+            print(f"Find the TF-IDF for {args.docid} and {args.term}")
+            tfidf_build(args.docid, args.term)
+        case "bm25idf":
+            bm25idf_build(args.term)
+        case "bm25tf":
+            bm25_tf_command(args.doc_id, args.term,args.b,args.k1)
+        case "bm25search":
+            bm25_search(args.query)
+
         case _:
             parser.print_help()
 
@@ -115,6 +163,32 @@ def term_frequency_search(doc_id:str, term: str):
     indexed_movies.load()
     results = indexed_movies.get_tf(doc_id, term)
     print(results)
+
+def idf_build(term:str):
+    
+    idf = indexed_movies.get_idf(term)
+    print(f"Inverse document frequency is {idf:.2f}")
+
+def tfidf_build(docid:int,term:str):    
+    tf_idf = indexed_movies.get_tfidf(int(docid),term)
+    print(f"TF-IDF score of '{term}' in document '{docid}': {tf_idf:.2f}")
+
+    
+def bm25idf_build(term:str):    
+    bm25idf = indexed_movies.get_bm25_idf(term)
+    print(f"BM25 IDF score of '{term}': {bm25idf:.2f}")
+
+def bm25_tf_command(doc_id:int, term:str, b, k1):
+    bm25tf = indexed_movies.get_bm25_tf(doc_id,term,b,k1)
+    print(f"BM25 TF score of '{term}' in document '{doc_id}': {bm25tf:.2f}")
+
+def bm25_search(query, limit=5):
+    scores_list = indexed_movies.bm25_search(query, limit)
+    num = 1
+    for docid,title,score in scores_list:
+        print(f"{num}. ({docid}) {title} - Score: {score})")
+        num = num + 1
+
 
 
 

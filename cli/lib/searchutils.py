@@ -2,7 +2,8 @@ import re
 import string 
 from .invertedindex import InvertedIndex
 from .stems import *
-
+BM25_K1 = 1.5
+BM25_B = 0.75
 
 STOPWORD_FILE = "data/stopwords.txt"
 
