@@ -109,7 +109,7 @@ def search(query,limit=5):
     with open("data/movies.json") as file:
         movie_file = json.load(file)
 
-    embeddings = semantic_search.load_or_create_embeddings(movie_file)
+    semantic_search.load_or_create_embeddings(movie_file)
     results = semantic_search.search(query,limit)
     for result in results:
         print(f"{result[1]['title']}: (score: {result[0]})\n{result[1]['description']}")
@@ -117,4 +117,4 @@ def search(query,limit=5):
 def load_movies():
     with open("data/movies.json") as file:
         movie_file = json.load(file)
-    return movie_file 
+    return movie_file["movies"] 
