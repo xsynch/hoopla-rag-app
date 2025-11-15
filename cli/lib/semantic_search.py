@@ -1,3 +1,4 @@
+import re
 from sentence_transformers import SentenceTransformer
 import numpy as np
 import os 
@@ -118,3 +119,69 @@ def load_movies():
     with open("data/movies.json") as file:
         movie_file = json.load(file)
     return movie_file["movies"] 
+
+def chunk_text(text:str,chunksize:int, overlapsize):
+    split_data = text.split()
+    
+    chunked_text = chunk_data(text,chunksize,overlapsize)
+    # idx = 0
+    # while idx < len(split_data):
+    #     if overlapsize > 0 and idx != 0:
+    #         chunked_text.append(split_data[abs(idx - overlapsize):idx + chunksize])
+    #     else:
+    #         chunked_text.append(split_data[idx:idx + chunksize])
+    #     idx = idx + chunksize
+    # for index  in range(len(split_data)):
+    #     if(index * chunksize) > len(split_data):
+    #         break        
+    #     if index == 0:
+    #         chunked_text.append(split_data[:chunksize])            
+    #     else:
+    #         chunked_text.append(split_data[index * chunksize:(index * chunksize) +chunksize])
+
+
+    print(f"Chunking {len(text)} characters")
+    for i in range(len(chunked_text)):
+        sentence = ' '.join(chunked_text[i])
+        if len(sentence) > 0:
+            print(f"{i+1}. {' '.join(chunked_text[i])}")
+
+
+def chunk_data(text:str, chunksize:int, overlapsize:int):
+    split_data = text.split()
+    
+    chunked_text = []
+    idx = 0
+    while idx < len(split_data):
+        if overlapsize > 0 and idx != 0:
+            chunked_text.append(split_data[abs(idx - overlapsize):idx + chunksize])
+        else:
+            chunked_text.append(split_data[idx:idx + chunksize])
+        idx = idx + chunksize 
+    return chunked_text
+
+def chunk_sentences(text:str, chunksize:int, overlapsize:int):
+    sentences = re.split(r"(?<=[.!?])\s+",text)
+    # print(f"Sentences: {sentences}")
+    chunked_text = []
+    idx = 0
+    while idx < len(sentences):
+        chunk_sentences = sentences[idx: idx + chunksize]
+        if chunked_text and len(chunk_sentences) <= overlapsize:
+            break
+        # if overlapsize > 0 and idx != 0:
+        #     chunked_text.append(sentences[abs(idx - overlapsize):idx + chunksize])
+        # else:
+        #     chunked_text.append(sentences[idx:idx + chunksize])
+        chunked_text.append(chunk_sentences)
+        idx = idx + chunksize - overlapsize
+    return chunked_text
+
+
+def semantic_chunk(text:str, max_chunk_size:int, overlap:int):
+    print(f"Semantically chunking {len(text)} characters")
+    chunked_sentences = chunk_sentences(text,max_chunk_size,overlap)
+    for i in range(len(chunked_sentences)):
+        sentence = ' '.join(chunked_sentences[i])
+        if len(sentence) > 0:
+            print(f"{i+1}. {' '.join(chunked_sentences[i])}")

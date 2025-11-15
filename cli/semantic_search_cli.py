@@ -20,6 +20,17 @@ def main():
     search_query_parser.add_argument("query",help="Terms to search for in documents")    
     search_query_parser.add_argument("--limit",type=int, help="Limit the amount of returned answers, the default of 5")
     
+    chunk_query_parser = subparsers.add_parser("chunk",help="Create a chunk for splitting text")
+    chunk_query_parser.add_argument("text",type=str,help="Text to chunk")
+    chunk_query_parser.add_argument("--chunk-size",default=200, type=int,help="Set the chunk size, default is 200")
+    chunk_query_parser.add_argument("--overlap",type=int, default=0,help="Number of chunks  to create chunk that share words")
+
+    semantic_chunk_parser = subparsers.add_parser("semantic_chunk",help="Create a chunk of sentences")
+    semantic_chunk_parser.add_argument("text",type=str,help="Sentences to chunk")
+    semantic_chunk_parser.add_argument("--max-chunk-size",type=int,default=4,help="Max Chunk Size")
+    semantic_chunk_parser.add_argument("--overlap",type=int,default=0,help="Overlap for searches")
+
+
 
     args = parser.parse_args()
 
@@ -36,6 +47,10 @@ def main():
             embed_query(args.query)
         case "search":
             search(args.query, args.limit)
+        case "chunk":            
+            chunk(args.text, args.chunk_size,args.overlap)
+        case "semantic_chunk":
+            semantic_chunk(args.text,args.max_chunk_size,args.overlap)
         
         case _:
             parser.print_help()
@@ -51,6 +66,11 @@ def embed_query(query_text):
     semantic_search.embed_query_text(query_text)
 def search(query,limit):
     semantic_search.search(query,limit)
+def chunk(text, size, overlapsize):
+   semantic_search.chunk_text(text,size,overlapsize)
+def semantic_chunk(text,max_chunk_size,overlap):
+    semantic_search.semantic_chunk(text,max_chunk_size,overlap)
+
 
 if __name__ == "__main__":
     main()
