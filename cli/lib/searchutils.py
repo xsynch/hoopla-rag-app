@@ -2,10 +2,31 @@ import re
 import string 
 from .invertedindex import InvertedIndex
 from .stems import *
+import json
+import os 
 BM25_K1 = 1.5
 BM25_B = 0.75
 
+MAX_CHUNK_SIZE=4
+OVERLAP=0
+SCORE_PRECISION = 3
+
+
+DEFAULT_CHUNK_SIZE = 200
+DEFAULT_CHUNK_OVERLAP = 1
+DEFAULT_SEMANTIC_CHUNK_SIZE = 4
+
+DEFAULT_ALPHA=0.5
+DEFAULT_ALPHA_LIMIT=5
+
+
+
 STOPWORD_FILE = "data/stopwords.txt"
+
+CACHE_DIR = "cache"
+MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
+CHUNK_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "chunk_embeddings.npy")
+CHUNK_METADATA_PATH = os.path.join(CACHE_DIR, "chunk_metadata.json")
 
 def get_movies_from_search(search_title, movieIndex:InvertedIndex):
     movie_data = ""
@@ -88,3 +109,8 @@ def load_and_strip_stopwords(data):
         return None 
     else:
         return data 
+    
+def load_movies():
+    with open("data/movies.json") as file:
+        movie_file = json.load(file)
+    return movie_file["movies"] 

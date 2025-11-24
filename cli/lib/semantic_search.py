@@ -8,18 +8,17 @@ EMBEDDINGS_CACHE="movie_embeddings.npy"
 CACHE_DIR="cache"
 
 class SemanticSearch():
-    def __init__(self):
-        self.model = SentenceTransformer('all-MiniLM-L6-v2')
+    def __init__(self,model_name='all-MiniLM-L6-v2'):
+        self.model = SentenceTransformer(model_name)
         self.embeddings = None 
         self.documents = None 
         self.document_map = {}
         self.embeddings_path = os.path.join(CACHE_DIR,EMBEDDINGS_CACHE)
     
-    def generate_embedding(self,text):
-        if len(text) == 0 or text.isspace():
-            raise ValueError("Please provide text")
-        embeddings = self.model.encode([text])
-        return embeddings[0]
+    def generate_embedding(self, text):
+        if not text or not text.strip():
+            raise ValueError("cannot generate embedding for empty text")
+        return self.model.encode([text])[0]
     
     def build_embeddings(self, documents):
         doc_string = []
@@ -169,10 +168,7 @@ def chunk_sentences(text:str, chunksize:int, overlapsize:int):
         chunk_sentences = sentences[idx: idx + chunksize]
         if chunked_text and len(chunk_sentences) <= overlapsize:
             break
-        # if overlapsize > 0 and idx != 0:
-        #     chunked_text.append(sentences[abs(idx - overlapsize):idx + chunksize])
-        # else:
-        #     chunked_text.append(sentences[idx:idx + chunksize])
+
         chunked_text.append(chunk_sentences)
         idx = idx + chunksize - overlapsize
     return chunked_text
@@ -180,8 +176,29 @@ def chunk_sentences(text:str, chunksize:int, overlapsize:int):
 
 def semantic_chunk(text:str, max_chunk_size:int, overlap:int):
     print(f"Semantically chunking {len(text)} characters")
-    chunked_sentences = chunk_sentences(text,max_chunk_size,overlap)
+    chunked_sentences = semantic_chunk_2(text,max_chunk_size,overlap)
     for i in range(len(chunked_sentences)):
-        sentence = ' '.join(chunked_sentences[i])
-        if len(sentence) > 0:
-            print(f"{i+1}. {' '.join(chunked_sentences[i])}")
+        # sentence = ' '.join(chunked_sentences[i])
+        if len(chunked_sentences[i]) > 0:
+            print(f"{i+1}. {chunked_sentences[i]}")
+
+def semantic_chunk_2( text: str, max_chunk_size: int = 200, overlap: int = 1,) -> list[str]:
+    text = text.strip()
+    if not text:
+        return []
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    
+    chunks = []
+    i = 0
+    n_sentences = len(sentences)
+    if n_sentences == 1 and not (" ".join(sentences)).endswith((".","!","?")):
+        return sentences
+    while i < n_sentences:
+        chunk_sentences = sentences[i : i + max_chunk_size]
+        if chunks and len(chunk_sentences) <= overlap:
+            break
+        chunk_sentences = " ".join(chunk_sentences).strip()
+        if chunk_sentences:
+            chunks.append(chunk_sentences)
+        i += max_chunk_size - overlap
+    return chunks
