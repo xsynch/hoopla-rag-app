@@ -1,5 +1,5 @@
 import argparse
-from lib.hybrid_search import get_normalized_scores,get_results_weighted_scores
+from lib.hybrid_search import get_normalized_scores,get_results_weighted_scores,get_rrf_search
 
 from lib.searchutils import (
     DEFAULT_ALPHA,
@@ -18,6 +18,11 @@ def main() -> None:
     alpha_parserver.add_argument("--alpha",type=float,help="Constant to use to dynamically control the weighing of scores")
     alpha_parserver.add_argument("--limit",type=int,default=DEFAULT_ALPHA_LIMIT,help="The amount of results to be returned")
 
+    rrf_search_parser = subparsers.add_parser("rrf-search",help="Execute Hybrid Search using Reciprocal Rank Fusion")
+    rrf_search_parser.add_argument("query",type=str,help="What to search for")
+    rrf_search_parser.add_argument("--k",type=int,default=60,help="K to use for the search")
+    rrf_search_parser.add_argument("--limit",type=int,default=5,help="Limit the amount of returned values")
+
     args = parser.parse_args()
 
     match args.command:
@@ -25,6 +30,8 @@ def main() -> None:
             normalize_scores(args.scores)
         case "weighted-search":
             weighted_search(args.query,args.alpha,args.limit)
+        case "rrf-search":
+            rrf_search(args.query,args.k,args.limit)
         case _:
             parser.print_help()
     
@@ -36,6 +43,9 @@ def normalize_scores(scores):
 def weighted_search(query,alpha=DEFAULT_ALPHA,limit=DEFAULT_ALPHA_LIMIT):
     print(f"Getting results for {query}")
     get_results_weighted_scores(query,alpha,limit) 
+
+def rrf_search(query,k,limit):
+    get_rrf_search(query,k,limit)
 
 
 if __name__ == "__main__":

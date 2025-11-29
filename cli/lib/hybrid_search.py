@@ -1,6 +1,7 @@
+import enum
 import os
 
-from .searchutils import load_movies
+from .searchutils import load_movies, DEFAULT_K,DEFAULT_K_LIMIT
 from .invertedindex import InvertedIndex
 from .chunkedsemanticsearch import ChunkedSemanticSearch
 
@@ -22,21 +23,166 @@ class HybridSearch:
         return self.idx.bm25_search(query, limit)
 
     def weighted_search(self, query, alpha, limit=5):
-        results = {}
+        
         bm_score_list = []
+        bm_score_standard = []
+        ch_score_list = []
+        ch_score_standard = []
+        combined_results = {}
+        
         bm25_results = self._bm25_search(query,limit*500)
         chunked_results = self.semantic_search.search_chunks(query,limit*500)
         # print(f"The length of bm25 results: {len(bm25_results)} and chunked results: {len(chunked_results)}")
-        for r in range(len(bm25_results)):
-            bm_score = bm25_results[r][2]
-            bm_score_list.append(bm_score)
+
+        bm_score_list = [ x[2] for x in bm25_results]
         bm_norm_scores = self.normalize_scores(bm_score_list)
+        for i,value in enumerate(bm25_results):
+            bm_score_standard.append({
+                "id": value[0],
+                "title": value[1],
+                "keyword_score":value[2],
+                "normalized_score":bm_norm_scores[i],
+            })
+
+        ch_score_list = [chunk["score"] for chunk in chunked_results]
+        ch_norm_scores = self.normalize_scores(ch_score_list)
+        for i, value in enumerate(chunked_results):
+            ch_score_standard.append({
+                "id":value["id"],
+                "title":value["title"],                
+                "normalized_score": ch_norm_scores[i],
+            })
+        for ks in bm_score_standard:
+            docid = ks["id"]
+            document = self.semantic_search.document_map[docid]
+            if docid not in combined_results:
+                combined_results[docid] = {
+                    "id":docid,
+                    "title": ks["title"],
+                    "document":document,
+                    "bm25_score":0.0,
+                    "semantic_score":0.0,
+                    
+
+                }
+                combined_results[docid]["bm25_score"] = max(
+                    ks["normalized_score"],combined_results[docid]["bm25_score"]
+                )
+        for chs in ch_score_standard:
+            docid = chs["id"]
+            document = self.semantic_search.document_map[docid]
+            if docid not in combined_results:
+                combined_results[docid] = {
+                    "id":docid,
+                    "title": chs["title"],
+                    "document":document,
+                    "semantic_score":0.0,
+                    "bm25_score":0.0,
+                    
+
+                }
+                combined_results[docid]["semantic_score"] = max(
+                    chs["normalized_score"],combined_results[docid]["semantic_score"]
+                )
+            else:
+                combined_results[docid]["semantic_score"] = chs["normalized_score"]
+        
+        for doc in combined_results:
+            info = combined_results[doc]
+            # print(f"{info["title"][:limit]}")
+            combined_results[doc]["weighted_score"] = hybrid_score(info["bm25_score"],info["semantic_score"],alpha)
+        # print(type(combined_results))
+        combined_results = sorted(combined_results.items(),key=lambda x: x[1]["weighted_score"],reverse=True)
+        print(type(combined_results))
+        return combined_results[:limit]
+        # print(f"Number of keyword scores: {len(bm_norm_scores)} and Number of chunk scores: {len(ch_norm_scores)} ")
+    def rrf_search(self, query, k=DEFAULT_K, limit=DEFAULT_K_LIMIT):        
+        bm_score_list = []
+        bm_score_standard = []
+        ch_score_list = []
+        ch_score_standard = []
+        combined_results = {}
+        
+        bm25_results = self._bm25_search(query,limit*500)
+        chunked_results = self.semantic_search.search_chunks(query,limit*500)
+        
+
+        # bm_score_list = [ x[2] for x in bm25_results]
+        # bm_norm_scores = self.normalize_scores(bm_score_list)
+        for i,value in enumerate(bm25_results):
+            bm_score_standard.append({
+                "id": value[0],
+                "title": value[1],
+                "bm25_rank":i,
+                "rrf_score": rrf_score(i,k),
+                
+            })
+
+        # ch_score_list = [chunk["score"] for chunk in chunked_results]
+        # ch_norm_scores = self.normalize_scores(ch_score_list)
+        for i, value in enumerate(chunked_results):
+            ch_score_standard.append({
+                "id":value["id"],
+                "title":value["title"],                
+                "semantic_rank": i,
+                "rrf_score": rrf_score(i,k)
+            })
+        for i,ks in enumerate(bm_score_standard):
+            docid = ks["id"]
+            document = self.semantic_search.document_map[docid]
+            if docid not in combined_results:
+                combined_results[docid] = {
+                    "id":docid,
+                    "title": ks["title"],
+                    "document":document,
+                    "bm25_rank":ks["bm25_rank"],
+                    "rrf_score": ks["rrf_score"],
+                    
+
+                }
+                # combined_results[docid]["bm25_score"] = max(
+                #     ks["normalized_score"],combined_results[docid]["bm25_score"]
+                # )
+        for i,chs in enumerate(ch_score_standard):
+            docid = chs["id"]
+            document = self.semantic_search.document_map[docid]
+            if docid not in combined_results:
+                combined_results[docid] = {
+                    "id":docid,
+                    "title": chs["title"],
+                    "document":document,
+                    "semantic_rank":chs["semantic_rank"],
+                    "rrf_score": chs["rrf_score"],
+                    "bm25_rank":0,
+                    
+
+                }
+
+            else:
+                combined_results[docid]["rrf_score"] = chs["rrf_score"] + combined_results[docid]["rrf_score"]
+                combined_results[docid]["semantic_rank"] = chs["semantic_rank"]
+        
+        # for doc in combined_results:
+        #     info = combined_results[doc]
+        #     # print(f"{info["title"][:limit]}")
+        #     combined_results[doc]["weighted_score"] = hybrid_score(info["bm25_score"],info["semantic_score"],alpha)
+        # print(type(combined_results))
+        combined_results = sorted(combined_results.items(),key=lambda x: x[1]["rrf_score"],reverse=True)
+        print(type(combined_results))
+        return combined_results[:limit]
+    
+    def get_semantic_keyword_results(keyword_results,semantic_results):
+        combined_results = []
+        return combined_results
+
+    
+
             
 
         
 
-    def rrf_search(self, query, k, limit=10):
-        raise NotImplementedError("RRF hybrid search is not implemented yet.")
+    # def rrf_search(self, query, k, limit=10):
+    #     raise NotImplementedError("RRF hybrid search is not implemented yet.")
     
     def normalize_scores(self,scores_list):
         scores_floats = [float(x) for x in scores_list]
@@ -65,7 +211,31 @@ def get_normalized_scores(score_list):
 def get_results_weighted_scores(query,alpha,limit):
     documents = load_movies()
     hybrid_searcher = HybridSearch(documents)
-    hybrid_searcher.weighted_search(query,alpha,limit)
+    results = hybrid_searcher.weighted_search(query,alpha,limit)
+    # print(results)
+    for i in range(len(results)):
+        title = results[i][1]["title"]
+        hybrid_score = results[i][1]["weighted_score"]
+        description = results[i][1]["document"]["description"][:100]
+        bm25_score = results[i][1]["bm25_score"]
+        semantic_score = results[i][1]["semantic_score"]
+        print(f"{i+1}. {title}\nHybrid Score: {hybrid_score: .3f}\nBM25: {bm25_score: .3f} Semantic: {semantic_score: .3f}\n{description}")
 
-def hybrid_score(bm25_score, semantic_score, alpha=0.5):
+def hybrid_score(bm25_score, semantic_score, alpha=0.5):    
     return alpha * bm25_score + (1 - alpha) * semantic_score
+
+def rrf_score(rank, k=60):
+    return 1 / (k + rank)
+
+def get_rrf_search(query,k,limit):
+    documents = load_movies()
+    hybrid_searcher = HybridSearch(documents)
+    results = hybrid_searcher.rrf_search(query,k,limit)    
+    for i in range(len(results)):
+        title = results[i][1]["title"]
+        rrf_score = results[i][1]["rrf_score"]
+        description = results[i][1]["document"]["description"][:100]
+        bm25_rank = results[i][1]["bm25_rank"]
+        semantic_rank = results[i][1]["semantic_rank"]
+        print(f"{i+1}. {title}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
+
