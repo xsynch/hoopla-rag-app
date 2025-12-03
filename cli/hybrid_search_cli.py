@@ -1,5 +1,6 @@
 import argparse
 from lib.hybrid_search import get_normalized_scores,get_results_weighted_scores,get_rrf_search
+from lib.searchutils import get_gemini_response
 
 from lib.searchutils import (
     DEFAULT_ALPHA,
@@ -22,6 +23,8 @@ def main() -> None:
     rrf_search_parser.add_argument("query",type=str,help="What to search for")
     rrf_search_parser.add_argument("--k",type=int,default=60,help="K to use for the search")
     rrf_search_parser.add_argument("--limit",type=int,default=5,help="Limit the amount of returned values")
+    rrf_search_parser.add_argument("--enhance", type=str, choices=["spell","rewrite","expand"],help="Query enhancement method",)
+    rrf_search_parser.add_argument("--rerank-method ", type=str, choices=["individual"],help="Query enhancement method",)
 
     args = parser.parse_args()
 
@@ -31,7 +34,7 @@ def main() -> None:
         case "weighted-search":
             weighted_search(args.query,args.alpha,args.limit)
         case "rrf-search":
-            rrf_search(args.query,args.k,args.limit)
+            rrf_search(args.query,args.k,args.limit,args.enhance,args.rerank_method)
         case _:
             parser.print_help()
     
@@ -44,8 +47,13 @@ def weighted_search(query,alpha=DEFAULT_ALPHA,limit=DEFAULT_ALPHA_LIMIT):
     print(f"Getting results for {query}")
     get_results_weighted_scores(query,alpha,limit) 
 
-def rrf_search(query,k,limit):
-    get_rrf_search(query,k,limit)
+def rrf_search(query,k,limit,enhanced_search,rerank_method):
+    if not enhanced_search:
+        get_rrf_search(query,k,limit)
+    else:
+        enhanced_terms = get_gemini_response(enhanced_search,query)
+        get_rrf_search(enhanced_terms,k,limit)
+
 
 
 if __name__ == "__main__":

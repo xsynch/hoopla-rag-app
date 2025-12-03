@@ -93,7 +93,7 @@ class HybridSearch:
             combined_results[doc]["weighted_score"] = hybrid_score(info["bm25_score"],info["semantic_score"],alpha)
         # print(type(combined_results))
         combined_results = sorted(combined_results.items(),key=lambda x: x[1]["weighted_score"],reverse=True)
-        print(type(combined_results))
+        # print(type(combined_results))
         return combined_results[:limit]
         # print(f"Number of keyword scores: {len(bm_norm_scores)} and Number of chunk scores: {len(ch_norm_scores)} ")
     def rrf_search(self, query, k=DEFAULT_K, limit=DEFAULT_K_LIMIT):        
@@ -168,7 +168,7 @@ class HybridSearch:
         #     combined_results[doc]["weighted_score"] = hybrid_score(info["bm25_score"],info["semantic_score"],alpha)
         # print(type(combined_results))
         combined_results = sorted(combined_results.items(),key=lambda x: x[1]["rrf_score"],reverse=True)
-        print(type(combined_results))
+        # print(type(combined_results))
         return combined_results[:limit]
     
     def get_semantic_keyword_results(keyword_results,semantic_results):
