@@ -1,9 +1,11 @@
 import enum
 import os
+import json 
 
-from .searchutils import load_movies, DEFAULT_K,DEFAULT_K_LIMIT
+from .searchutils import load_movies, DEFAULT_K,DEFAULT_K_LIMIT, get_gemini_response_rerank, get_gemini_batch_rerank
 from .invertedindex import InvertedIndex
 from .chunkedsemanticsearch import ChunkedSemanticSearch
+from sentence_transformers import CrossEncoder
 
 
 class HybridSearch:
@@ -227,15 +229,70 @@ def hybrid_score(bm25_score, semantic_score, alpha=0.5):
 def rrf_score(rank, k=60):
     return 1 / (k + rank)
 
-def get_rrf_search(query,k,limit):
+def get_rrf_search(query,k,limit,rerank_method=None):
+    rerank_results = []
+    
+    if rerank_method:
+        limit = limit * 5
     documents = load_movies()
     hybrid_searcher = HybridSearch(documents)
-    results = hybrid_searcher.rrf_search(query,k,limit)    
+    results = hybrid_searcher.rrf_search(query,k,limit)   
+    if rerank_method == "individual":
+        print(f"Reranking the results")
+        for i in range(len(results)):
+            rerank_score = float(get_gemini_response_rerank(query,results[i][1]["document"]))        
+            results[i][1]["rerank_score"] = rerank_score
+        results  = sorted(results,key=lambda x: x[1]["rerank_score"],reverse=True )[:limit//5]        
+        
+    elif rerank_method == "batch":   
+        doc_list = []          
+        for i in range(len(results)):
+            doc_list.append(results[i][1]["document"])
+        batch_results = json.loads(get_batch_rerank(query,doc_list))
+        # print(f"Batch Results: {batch_results} json? {json.loads(batch_results)}")
+        # return 
+        for i in range(len(results)):
+            if results[i][1]["document"]["id"] in batch_results:
+                print(f"{results[i][1]["document"]["id"]} is being updated")
+                results[i][1]["rerank_score"] = batch_results.index(results[i][1]["document"]["id"]) +1           
+        
+        results  = sorted(results,key=lambda x: x[1]["rerank_score"],reverse=False )[:limit//5]  
+    elif rerank_method == "cross_encoder":
+        doc_list = []          
+        for i in range(len(results)):
+            doc_list.append(results[i][1]["document"])
+        scores = get_crossencoder_rerank(query,doc_list)
+        for i in range(len(scores)):
+            results[i][1]["cross_encoder_score"] = scores[i]
+        results  = sorted(results,key=lambda x: x[1]["cross_encoder_score"],reverse=True )[:limit//5]
+    
     for i in range(len(results)):
         title = results[i][1]["title"]
         rrf_score = results[i][1]["rrf_score"]
         description = results[i][1]["document"]["description"][:100]
         bm25_rank = results[i][1]["bm25_rank"]
         semantic_rank = results[i][1]["semantic_rank"]
-        print(f"{i+1}. {title}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
+        rerank_score = results[i][1].get("rerank_score","")
+        cross_encoder_score = results[i][1].get("cross_encoder_score","")
+        if rerank_method is None:
+            print(f"{i+1}. {title}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
+        elif rerank_method == "indivicual" or rerank_method == "batch":
+            print(f"{i+1}. {title}\nRerank Score: {rerank_score: .3f}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
+        elif rerank_method == "cross_encoder":
+            print(f"{i+1}. {title}\nCross Encoder Score: {cross_encoder_score: .3f}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
 
+
+def get_batch_rerank(query,documents):
+    batch_results = get_gemini_batch_rerank(query,documents)
+    return batch_results
+
+def get_crossencoder_rerank(query,documents)->list:
+    cross_encoder = CrossEncoder("cross-encoder/ms-marco-TinyBERT-L2-v2")
+    pairs = []
+    for doc in documents:
+        pairs.append([query, f"{doc.get('title', '')} - {doc.get('description', '')}"])
+    
+
+    # scores is a list of numbers, one for each pair
+    scores = cross_encoder.predict(pairs)
+    return scores

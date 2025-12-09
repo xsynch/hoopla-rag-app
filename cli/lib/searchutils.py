@@ -1,5 +1,6 @@
 import re 
-import string 
+import string
+from time import sleep 
 from .invertedindex import InvertedIndex
 from .stems import *
 import json
@@ -134,16 +135,7 @@ def get_gemini_response(method,query):
         case "rewrite":
             prompt = get_rewrite_prompt(query)
         case "expand":
-            prompt = get_expand_prompt(query)
-            
-#     prompt = f"""Fix any spelling errors in this movie search query.
-
-# Only correct obvious typos. Don't change correctly spelled words.
-
-# Query: "{query}"
-
-# If no errors, return the original query.
-# Corrected:"""
+            prompt = get_expand_prompt(query)  
 
 
     client = genai.Client(api_key=api_key)
@@ -153,6 +145,44 @@ def get_gemini_response(method,query):
     if response.text != query:
         print( f"Enhanced query ({method}): '{query}' -> '{response.text}'\n")
     return response.text
+
+
+def get_gemini_response_rerank(query,document):
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    # print(f"Reranking document: {document}")
+    rerank_prompt = get_rerank_results(query,document)
+    # print(f"Rerank Prompt: {rerank_prompt}")
+
+
+    client = genai.Client(api_key=api_key)
+
+    response = client.models.generate_content(
+        model='gemini-2.0-flash-001', contents=rerank_prompt)
+    sleep(3)
+    # print(f"Response: {response}")
+    return response.text
+
+
+def get_gemini_batch_rerank(query,doc_list):
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    
+    rerank_prompt = get_batch_rerank_prompt(query,doc_list)
+    
+
+
+    client = genai.Client(api_key=api_key)
+
+    response = client.models.generate_content(
+        model='gemini-2.0-flash-001', contents=rerank_prompt)
+    
+    # print(f"Response: {response}")
+    #the response is not coming back with valid json so I need to strip ```json from the front and ``` from the back
+    response_result = response.text.lstrip("```json").rstrip("```")
+    return response_result
 
 def get_rewrite_prompt(query):
     return(f"""Rewrite this movie search query to be more specific and searchable.
@@ -198,4 +228,35 @@ Examples:
 - "comedy with bear" -> "comedy funny bear humor lighthearted"
 
 Query: "{query}"
+"""
+
+def get_rerank_results(query,doc):
+    prompt =  f"""Rate how well this movie matches the search query.
+
+Query: "{query}"
+Movie: {doc.get("title", "")} - {doc.get("description", "")}
+
+Consider:
+- Direct relevance to query
+- User intent (what they're looking for)
+- Content appropriateness
+
+Rate 0-10 (10 = perfect match).
+Give me ONLY the number in your response, no other text or explanation.
+
+Score:"""
+    return prompt
+
+
+def get_batch_rerank_prompt(query,document_list):
+   return  f"""Rank these movies by relevance to the search query.
+
+Query: "{query}"
+
+Movies:
+{document_list}
+
+Return ONLY the IDs in order of relevance (best match first). Return a valid JSON list, nothing else. Do not wrap the list in ```json For example:
+
+[75, 12, 34, 2, 1]
 """

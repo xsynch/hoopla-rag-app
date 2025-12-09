@@ -24,7 +24,7 @@ def main() -> None:
     rrf_search_parser.add_argument("--k",type=int,default=60,help="K to use for the search")
     rrf_search_parser.add_argument("--limit",type=int,default=5,help="Limit the amount of returned values")
     rrf_search_parser.add_argument("--enhance", type=str, choices=["spell","rewrite","expand"],help="Query enhancement method",)
-    rrf_search_parser.add_argument("--rerank-method ", type=str, choices=["individual"],help="Query enhancement method",)
+    rrf_search_parser.add_argument("--rerank-method", type=str, choices=["individual","batch","cross_encoder"],help="Query enhancement method",)
 
     args = parser.parse_args()
 
@@ -48,11 +48,13 @@ def weighted_search(query,alpha=DEFAULT_ALPHA,limit=DEFAULT_ALPHA_LIMIT):
     get_results_weighted_scores(query,alpha,limit) 
 
 def rrf_search(query,k,limit,enhanced_search,rerank_method):
-    if not enhanced_search:
-        get_rrf_search(query,k,limit)
-    else:
+    if not enhanced_search and rerank_method:
+        get_rrf_search(query,k,limit,rerank_method)
+    elif enhanced_search:
         enhanced_terms = get_gemini_response(enhanced_search,query)
         get_rrf_search(enhanced_terms,k,limit)
+    else:
+        get_rrf_search(query,k,limit)
 
 
 
