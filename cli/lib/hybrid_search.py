@@ -2,10 +2,13 @@ import enum
 import os
 import json 
 
-from .searchutils import load_movies, DEFAULT_K,DEFAULT_K_LIMIT, get_gemini_response_rerank, get_gemini_batch_rerank
+from .searchutils import get_gemini_response, load_movies, DEFAULT_K,DEFAULT_K_LIMIT, get_gemini_response_rerank, get_gemini_batch_rerank, get_gemini_evaluation
 from .invertedindex import InvertedIndex
 from .chunkedsemanticsearch import ChunkedSemanticSearch
 from sentence_transformers import CrossEncoder
+
+
+
 
 
 class HybridSearch:
@@ -98,7 +101,9 @@ class HybridSearch:
         # print(type(combined_results))
         return combined_results[:limit]
         # print(f"Number of keyword scores: {len(bm_norm_scores)} and Number of chunk scores: {len(ch_norm_scores)} ")
-    def rrf_search(self, query, k=DEFAULT_K, limit=DEFAULT_K_LIMIT):        
+    def rrf_search(self, query, k=DEFAULT_K, limit=DEFAULT_K_LIMIT,debug=False):  
+        if debug:
+            print(f"Original Query: {query}")      
         bm_score_list = []
         bm_score_standard = []
         ch_score_list = []
@@ -179,12 +184,6 @@ class HybridSearch:
 
     
 
-            
-
-        
-
-    # def rrf_search(self, query, k, limit=10):
-    #     raise NotImplementedError("RRF hybrid search is not implemented yet.")
     
     def normalize_scores(self,scores_list):
         scores_floats = [float(x) for x in scores_list]
@@ -229,9 +228,9 @@ def hybrid_score(bm25_score, semantic_score, alpha=0.5):
 def rrf_score(rank, k=60):
     return 1 / (k + rank)
 
-def get_rrf_search(query,k,limit,rerank_method=None):
-    rerank_results = []
-    
+def get_rrf_search(query,k,limit,evaluate=None,rerank_method=None,debug=False):
+    final_results = []
+
     if rerank_method:
         limit = limit * 5
     documents = load_movies()
@@ -274,12 +273,22 @@ def get_rrf_search(query,k,limit,rerank_method=None):
         semantic_rank = results[i][1]["semantic_rank"]
         rerank_score = results[i][1].get("rerank_score","")
         cross_encoder_score = results[i][1].get("cross_encoder_score","")
+        final_results.append(f"{i+1}. {title}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}")
         if rerank_method is None:
             print(f"{i+1}. {title}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
         elif rerank_method == "indivicual" or rerank_method == "batch":
             print(f"{i+1}. {title}\nRerank Score: {rerank_score: .3f}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
         elif rerank_method == "cross_encoder":
             print(f"{i+1}. {title}\nCross Encoder Score: {cross_encoder_score: .3f}\nRRF Score: {rrf_score: .3f}\nBM25 Rank: {bm25_rank} Semantic Rank: {semantic_rank}\n{description}")
+    if evaluate:
+        print(f"Evaluating the results and ranking them for '{query}'")        
+        responses = get_gemini_evaluation(query, final_results)
+        print(f"{responses}")
+        print(f"Length of final_results: {len(final_results)} Length of responses: {len(responses)}: ")
+        # for  i in range(len(responses)):
+        #     movie_title = final_results[i].split("\n")[0]
+        #     print(f"{movie_title}")
+            # print(f"{i+1}. {movie_title} {responses[i]/len(responses)}")
 
 
 def get_batch_rerank(query,documents):

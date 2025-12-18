@@ -35,14 +35,17 @@ class SemanticSearch():
     def load_or_create_embeddings(self, documents):        
         if self.documents is None:
             self.documents = documents 
-            for m in documents["movies"]:                           
+            # print(f"{documents[0]}")
+            # for m in documents["movies"]:                           
+            for m in documents:
                 self.document_map[m["id"]] = m
         if not os.path.isfile(self.embeddings_path):
             self.embeddings = self.build_embeddings(documents)
         else:
             self.embeddings = np.load(self.embeddings_path)
         # print(f"Length of embedings: {len(self.embeddings)} and documents {len(self.documents["movies"])}")
-        if len(self.documents["movies"]) == len(self.embeddings):
+        # if len(self.documents["movies"]) == len(self.embeddings):
+        if len(self.documents) == len(self.embeddings):
             return self.embeddings
         
     def search(self, query, limit):

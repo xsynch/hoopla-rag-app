@@ -1,6 +1,6 @@
 import argparse
 from lib.hybrid_search import get_normalized_scores,get_results_weighted_scores,get_rrf_search
-from lib.searchutils import get_gemini_response
+from lib.searchutils import get_gemini_response, get_gemini_evaluation
 
 from lib.searchutils import (
     DEFAULT_ALPHA,
@@ -25,6 +25,9 @@ def main() -> None:
     rrf_search_parser.add_argument("--limit",type=int,default=5,help="Limit the amount of returned values")
     rrf_search_parser.add_argument("--enhance", type=str, choices=["spell","rewrite","expand"],help="Query enhancement method",)
     rrf_search_parser.add_argument("--rerank-method", type=str, choices=["individual","batch","cross_encoder"],help="Query enhancement method",)
+    rrf_search_parser.add_argument("--debug",default=False,type=bool,help="Print Debug messages as search happens")
+    rrf_search_parser.add_argument("--evaluate",help="Evaluate the results of a search",action='store_true')
+    
 
     args = parser.parse_args()
 
@@ -34,7 +37,7 @@ def main() -> None:
         case "weighted-search":
             weighted_search(args.query,args.alpha,args.limit)
         case "rrf-search":
-            rrf_search(args.query,args.k,args.limit,args.enhance,args.rerank_method)
+            rrf_search(args.query,args.k,args.limit,args.enhance,args.rerank_method,args.evaluate,args.debug)
         case _:
             parser.print_help()
     
@@ -47,14 +50,14 @@ def weighted_search(query,alpha=DEFAULT_ALPHA,limit=DEFAULT_ALPHA_LIMIT):
     print(f"Getting results for {query}")
     get_results_weighted_scores(query,alpha,limit) 
 
-def rrf_search(query,k,limit,enhanced_search,rerank_method):
+def rrf_search(query,k,limit,enhanced_search,rerank_method,evaluate,debug=False):
     if not enhanced_search and rerank_method:
-        get_rrf_search(query,k,limit,rerank_method)
+        get_rrf_search(query,k,limit,rerank_method=rerank_method,evaluate=evaluate,debug=debug)
     elif enhanced_search:
         enhanced_terms = get_gemini_response(enhanced_search,query)
-        get_rrf_search(enhanced_terms,k,limit)
-    else:
-        get_rrf_search(query,k,limit)
+        get_rrf_search(enhanced_terms,k,limit,rerank_method=rerank_method,evaluate=evaluate,debug=debug)
+    else:        
+        get_rrf_search(query,k,limit,rerank_method=rerank_method,evaluate=evaluate,debug=debug)
 
 
 

@@ -33,9 +33,12 @@ DEFAULT_K_LIMIT=5
 STOPWORD_FILE = "data/stopwords.txt"
 
 CACHE_DIR = "cache"
+DATA_DIR = "data"
 MOVIE_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "movie_embeddings.npy")
 CHUNK_EMBEDDINGS_PATH = os.path.join(CACHE_DIR, "chunk_embeddings.npy")
 CHUNK_METADATA_PATH = os.path.join(CACHE_DIR, "chunk_metadata.json")
+
+GOLDEN_DATASET = os.path.join(DATA_DIR,"golden_dataset.json")
 
 def get_movies_from_search(search_title, movieIndex:InvertedIndex):
     movie_data = ""
@@ -75,32 +78,7 @@ def get_movies_from_search(search_title, movieIndex:InvertedIndex):
         movie_id = movieIndex.docmap[found_movie]["id"]
         print(f"Movie Title: {title} with id: {movie_id}")
     return results
-    #                                       
-    #         if(re.search(rf"{t.lower()}\w*" ,movieIndex.get_documents(t))):                
-    #             print(f"{title_count}. {movie["title"]}")            
-            # print(f"matches: {(movieIndex.get_documents(t))[0]}")
-            # results.append((movieIndex.get_documents(t))[0])
-            
-            
-    
-    
 
-
-
-    # for movie in movie_data["movies"]:
-    #     new_movie_title = ""
-    #     cleaned_movie_title=removePunctuation(movie["title"])
-    #     for w in cleaned_movie_title.split():
-    #         if  load_and_strip_stopwords(w) is not None:
-    #             w = stems.get_stem_from_token(w)
-    #             new_movie_title = f"{new_movie_title} {w}"
-        
-    #     new_movie_title = new_movie_title.lower()
-                 
-    #     for word in new_searched_movie.split():       
-    #         if(re.search(rf"{word.lower()}\w*" ,new_movie_title)):                
-    #             print(f"{title_count}. {movie["title"]}")
-    #             title_count = title_count + 1
     
 def removePunctuation(word):
     translator = str.maketrans('','',string.punctuation) 
@@ -124,7 +102,7 @@ def load_movies():
         movie_file = json.load(file)
     return movie_file["movies"] 
 
-def get_gemini_response(method,query):
+def get_gemini_response(method,query,formatted_results=None):
     load_dotenv()
     api_key = os.environ.get("GEMINI_API_KEY")
     prompt = ""
@@ -136,12 +114,19 @@ def get_gemini_response(method,query):
             prompt = get_rewrite_prompt(query)
         case "expand":
             prompt = get_expand_prompt(query)  
+        # case "rank_relevance":
+        #     # sleep(180)        
+        #     prompt = get_relevancerank_prompt(query,formatted_results=formatted_results)
+        #     print(f"{prompt}")
+        #     return 
 
 
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
         model='gemini-2.0-flash-001', contents=prompt)
+
+    
     if response.text != query:
         print( f"Enhanced query ({method}): '{query}' -> '{response.text}'\n")
     return response.text
@@ -183,6 +168,29 @@ def get_gemini_batch_rerank(query,doc_list):
     #the response is not coming back with valid json so I need to strip ```json from the front and ``` from the back
     response_result = response.text.lstrip("```json").rstrip("```")
     return response_result
+
+def get_gemini_evaluation(query,formatted_results):
+    
+    load_dotenv()
+
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    
+    
+    evaluation_prompt = get_relevancerank_prompt(query,formatted_results)
+
+
+
+    client = genai.Client(api_key=api_key)
+    # print(f"{evaluation_prompt}")
+    
+    
+    response = client.models.generate_content(model='gemini-2.5-flash', contents=evaluation_prompt)
+        
+
+    return response.text
+
+
 
 def get_rewrite_prompt(query):
     return(f"""Rewrite this movie search query to be more specific and searchable.
@@ -260,3 +268,23 @@ Return ONLY the IDs in order of relevance (best match first). Return a valid JSO
 
 [75, 12, 34, 2, 1]
 """
+
+def get_relevancerank_prompt(query, formatted_results):
+    return f"""Rate how relevant each result is to this query on a 0-3 scale:
+
+Query: "{query}"
+
+Results:
+{chr(10).join(formatted_results)}
+
+Scale:
+- 3: Highly relevant
+- 2: Relevant
+- 1: Marginally relevant
+- 0: Not relevant
+
+Do NOT give any numbers out than 0, 1, 2, or 3.
+
+Return ONLY the scores in the same order you were given the documents. Return a valid JSON list, nothing else. For example:
+
+[2, 0, 3, 2, 0, 1]"""
