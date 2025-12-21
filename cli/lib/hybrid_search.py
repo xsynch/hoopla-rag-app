@@ -104,9 +104,9 @@ class HybridSearch:
     def rrf_search(self, query, k=DEFAULT_K, limit=DEFAULT_K_LIMIT,debug=False):  
         if debug:
             print(f"Original Query: {query}")      
-        bm_score_list = []
+        
         bm_score_standard = []
-        ch_score_list = []
+        
         ch_score_standard = []
         combined_results = {}
         
@@ -175,6 +175,7 @@ class HybridSearch:
         #     combined_results[doc]["weighted_score"] = hybrid_score(info["bm25_score"],info["semantic_score"],alpha)
         # print(type(combined_results))
         combined_results = sorted(combined_results.items(),key=lambda x: x[1]["rrf_score"],reverse=True)
+        print("RRF top titles:", [r[1]["title"] for r in combined_results[:5]])
         # print(type(combined_results))
         return combined_results[:limit]
     
@@ -283,12 +284,13 @@ def get_rrf_search(query,k,limit,evaluate=None,rerank_method=None,debug=False):
     if evaluate:
         print(f"Evaluating the results and ranking them for '{query}'")        
         responses = get_gemini_evaluation(query, final_results)
-        print(f"{responses}")
-        print(f"Length of final_results: {len(final_results)} Length of responses: {len(responses)}: ")
-        # for  i in range(len(responses)):
-        #     movie_title = final_results[i].split("\n")[0]
-        #     print(f"{movie_title}")
-            # print(f"{i+1}. {movie_title} {responses[i]/len(responses)}")
+        
+        # print(f"{responses} of type {type(responses)}")
+        # print(f"Length of final_results: {len(final_results)} Length of responses: {len(responses)}: ")
+        for  i in range(len(responses)):
+            movie_title = final_results[i].split("\n")[0]
+            # print(f"{movie_title}")
+            print(f"{movie_title} {responses[i]}/3")
 
 
 def get_batch_rerank(query,documents):

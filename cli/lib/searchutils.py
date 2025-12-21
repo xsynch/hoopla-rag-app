@@ -188,7 +188,7 @@ def get_gemini_evaluation(query,formatted_results):
     response = client.models.generate_content(model='gemini-2.5-flash', contents=evaluation_prompt)
         
 
-    return response.text
+    return json.loads(response.text)
 
 
 

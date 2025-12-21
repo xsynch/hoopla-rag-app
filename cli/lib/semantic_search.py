@@ -35,9 +35,10 @@ class SemanticSearch():
     def load_or_create_embeddings(self, documents):        
         if self.documents is None:
             self.documents = documents 
-            # print(f"{documents[0]}")
-            # for m in documents["movies"]:                           
+            # print(f"Documents: {documents[0]}")
+            # for m in documents["movies"]:                                     
             for m in documents:
+                # print(f"{m} of documens of type: {type(documents)}")
                 self.document_map[m["id"]] = m
         if not os.path.isfile(self.embeddings_path):
             self.embeddings = self.build_embeddings(documents)
@@ -55,7 +56,7 @@ class SemanticSearch():
             raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
         embedding_query = self.generate_embedding(query)
         
-        for index, movie in enumerate(self.documents["movies"]):            
+        for index, movie in enumerate(self.documents):            
             # print(embed)
             similarity_score.append((cosine_similarity(embedding_query,self.embeddings[index]),movie))
             # print(f"{similarity_score}")
@@ -112,10 +113,10 @@ def search(query,limit=5):
     with open("data/movies.json") as file:
         movie_file = json.load(file)
 
-    semantic_search.load_or_create_embeddings(movie_file)
+    semantic_search.load_or_create_embeddings(movie_file["movies"])
     results = semantic_search.search(query,limit)
     for result in results:
-        print(f"{result[1]['title']}: (score: {result[0]})\n{result[1]['description']}")
+        print(f"{result[1]['title']}: (score: {result[0]})\n{result[1]['title']}")
 
 def load_movies():
     with open("data/movies.json") as file:
