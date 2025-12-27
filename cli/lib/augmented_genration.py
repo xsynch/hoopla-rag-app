@@ -76,9 +76,10 @@ Provide a comprehensive 3-4 sentence answer that combines information from multi
 
 
 
-def get_llm_citations(query,limit=5):
+def get_llm_citations(query,limit):
     movies = load_movies()
     searcher = HybridSearch(movies)
+    limit = 25
     results = searcher.rrf_search(query,limit)
     document_list = []
     print(f"Search Results:")
@@ -86,8 +87,8 @@ def get_llm_citations(query,limit=5):
         document_list.append(results[i][1]["document"])
         print(f"""
     - {results[i][1]["document"]["title"]}""")
-    # summary = get_results_citations(query,document_list)
-    # print(f"LLM Answer:\n{summary}")
+    summary = get_results_citations(query,document_list)
+    print(f"LLM Answer:\n{summary}")
 
 
 def get_results_citations(query,documents):
@@ -119,4 +120,41 @@ Answer:"""
     # print(response)      
     return response.text
 
+def get_answers(query,limit):
+    movies = load_movies()
+    searcher = HybridSearch(movies)
     
+    results = searcher.rrf_search(query,limit*5)
+    document_list = []
+    print(f"Search Results:")
+    for i in range(len(results)):
+        document_list.append(results[i][1]["document"])
+        print(f"""
+    - {results[i][1]["document"]["title"]}""")
+    answer = get_answer_from_llm(query,document_list)
+    print(f"Answer:\n{answer}")
+
+def get_answer_from_llm(question,context):
+    prompt = f"""Answer the user's question based on the provided movies that are available on Hoopla.
+
+This should be tailored to Hoopla users. Hoopla is a movie streaming service.
+
+Question: {question}
+
+Documents:
+{context}
+
+Instructions:
+- Answer questions directly and concisely
+- Be casual and conversational
+- Don't be cringe or hype-y
+- Talk like a normal person would in a chat conversation
+
+Answer:"""
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")    
+
+    client = genai.Client(api_key=api_key)    
+    response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)  
+    # print(response)      
+    return response.text

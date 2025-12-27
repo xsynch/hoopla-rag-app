@@ -124,7 +124,7 @@ def get_gemini_response(method,query,formatted_results=None):
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
-        model='gemini-2.0-flash-001', contents=prompt)
+        model='gemini-2.5-flash', contents=prompt)
 
     
     if response.text != query:
@@ -144,7 +144,7 @@ def get_gemini_response_rerank(query,document):
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
-        model='gemini-2.0-flash-001', contents=rerank_prompt)
+        model='gemini-2.5-flash', contents=rerank_prompt)
     sleep(3)
     # print(f"Response: {response}")
     return response.text
@@ -162,7 +162,7 @@ def get_gemini_batch_rerank(query,doc_list):
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
-        model='gemini-2.0-flash-001', contents=rerank_prompt)
+        model='gemini-2.5-flash', contents=rerank_prompt)
     
     # print(f"Response: {response}")
     #the response is not coming back with valid json so I need to strip ```json from the front and ``` from the back
